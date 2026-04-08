@@ -1,0 +1,159 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import (
+    accuracy_score, classification_report,
+    confusion_matrix, ConfusionMatrixDisplay
+)
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import warnings
+warnings.filterwarnings("ignore")
+
+# ── 1. Load data ────────────────────────────────────────────────────────────
+df = pd.read_csv("/mnt/user-data/uploads/Students_Performance_dataset.csv")
+print("=" * 60)
+print("STUDENT PERFORMANCE – BINARY CLASSIFICATION")
+print("=" * 60)
+print(f"\nDataset shape : {df.shape[0]} rows × {df.shape[1]} columns")
+
+# ── 2. Quick audit ───────────────────────────────────────────────────────────
+cgpa_col = "What is your current CGPA?"
+sgpa_col = "What was your previous SGPA?"
+
+print(f"\nCGPA range    : {df[cgpa_col].min():.2f} – {df[cgpa_col].max():.2f}")
+print(f"Missing values:\n{df.isnull().sum()[df.isnull().sum() > 0]}")
+
+# ── 3. Create binary target ──────────────────────────────────────────────────
+df["performance"] = (df[cgpa_col] >= 3.0).astype(int)   # 1 = good, 0 = at risk
+label_map = {0: "at risk", 1: "good performance"}
+print(f"\nClass distribution:\n"
+      f"  Good performance (CGPA ≥ 3.0) : {df['performance'].sum()}"
+      f"  ({df['performance'].mean()*100:.1f} %)\n"
+      f"  At risk          (CGPA < 3.0) : {(df['performance']==0).sum()}"
+      f"  ({(1-df['performance'].mean())*100:.1f} %)")
+
+# ── 4. Feature engineering ───────────────────────────────────────────────────
+# Drop the two CGPA/SGPA columns – they would trivially leak the target
+LEAKY = [cgpa_col, sgpa_col, "performance"]
+
+# Separate numeric and categorical columns
+X_raw = df.drop(columns=LEAKY)
+numeric_cols   = X_raw.select_dtypes(include=[np.number]).columns.tolist()
+categoric_cols = X_raw.select_dtypes(exclude=[np.number]).columns.tolist()
+
+print(f"\nFeatures used : {len(numeric_cols)} numeric, "
+      f"{len(categoric_cols)} categorical  (total {X_raw.shape[1]})")
+
+# Encode categoricals with LabelEncoder
+X_enc = X_raw.copy()
+le = LabelEncoder()
+for col in categoric_cols:
+    X_enc[col] = le.fit_transform(X_enc[col].astype(str))
+
+y = df["performance"]
+
+# ── 5. Train / test split ────────────────────────────────────────────────────
+X_train, X_test, y_train, y_test = train_test_split(
+    X_enc, y, test_size=0.2, random_state=42, stratify=y
+)
+print(f"\nTrain size : {len(X_train)}  |  Test size : {len(X_test)}")
+
+# ── 6. Scale features ────────────────────────────────────────────────────────
+scaler  = StandardScaler()
+X_train_sc = scaler.fit_transform(X_train)
+X_test_sc  = scaler.transform(X_test)
+
+# ── 7. Train Logistic Regression ─────────────────────────────────────────────
+model = LogisticRegression(max_iter=1000, random_state=42)
+model.fit(X_train_sc, y_train)
+
+# ── 8. Evaluate ──────────────────────────────────────────────────────────────
+y_pred       = model.predict(X_test_sc)
+y_pred_proba = model.predict_proba(X_test_sc)[:, 1]
+
+accuracy = accuracy_score(y_test, y_pred)
+
+print("\n" + "=" * 60)
+print(f"MODEL ACCURACY : {accuracy * 100:.2f}%")
+print("=" * 60)
+
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred,
+                             target_names=["At Risk", "Good Performance"]))
+
+# ── 9. Top feature importances ───────────────────────────────────────────────
+coef_df = pd.DataFrame({
+    "Feature"    : X_enc.columns,
+    "Coefficient": model.coef_[0],
+    "Abs"        : np.abs(model.coef_[0])
+}).sort_values("Abs", ascending=False).head(10)
+
+print("Top 10 Most Influential Features:")
+print(coef_df[["Feature", "Coefficient"]].to_string(index=False))
+
+# ── 10. Visualise results ────────────────────────────────────────────────────
+fig = plt.figure(figsize=(16, 10))
+fig.suptitle("Student Performance – Logistic Regression Results",
+             fontsize=15, fontweight="bold", y=1.01)
+gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.45, wspace=0.35)
+
+# (a) Class distribution
+ax0 = fig.add_subplot(gs[0, 0])
+counts = df["performance"].value_counts()
+bars = ax0.bar(["At Risk\n(CGPA < 3.0)", "Good Performance\n(CGPA ≥ 3.0)"],
+               [counts[0], counts[1]],
+               color=["#e74c3c", "#2ecc71"], edgecolor="white", linewidth=0.8)
+for bar, cnt in zip(bars, [counts[0], counts[1]]):
+    ax0.text(bar.get_x() + bar.get_width() / 2,
+             bar.get_height() + 8, str(cnt),
+             ha="center", va="bottom", fontweight="bold")
+ax0.set_title("Class Distribution", fontweight="bold")
+ax0.set_ylabel("Number of Students")
+ax0.set_ylim(0, max(counts) * 1.15)
+ax0.spines[["top", "right"]].set_visible(False)
+
+# (b) CGPA distribution by class
+ax1 = fig.add_subplot(gs[0, 1])
+at_risk = df.loc[df["performance"] == 0, cgpa_col]
+good    = df.loc[df["performance"] == 1, cgpa_col]
+ax1.hist(at_risk, bins=20, color="#e74c3c", alpha=0.7,
+         label=f"At Risk (n={len(at_risk)})", edgecolor="white")
+ax1.hist(good,    bins=20, color="#2ecc71", alpha=0.7,
+         label=f"Good (n={len(good)})",    edgecolor="white")
+ax1.axvline(3.0, color="black", linestyle="--", linewidth=1.5,
+            label="Threshold = 3.0")
+ax1.set_title("CGPA Distribution by Class", fontweight="bold")
+ax1.set_xlabel("CGPA")
+ax1.set_ylabel("Count")
+ax1.legend(fontsize=8)
+ax1.spines[["top", "right"]].set_visible(False)
+
+# (c) Confusion matrix
+ax2 = fig.add_subplot(gs[1, 0])
+cm = confusion_matrix(y_test, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=["At Risk", "Good Perf."])
+disp.plot(ax=ax2, colorbar=False, cmap="Blues")
+ax2.set_title(f"Confusion Matrix  (Accuracy: {accuracy*100:.2f}%)",
+              fontweight="bold")
+
+# (d) Top 10 feature importances
+ax3 = fig.add_subplot(gs[1, 1])
+colors = ["#e74c3c" if c < 0 else "#3498db"
+          for c in coef_df["Coefficient"]]
+ax3.barh(coef_df["Feature"][::-1],
+         coef_df["Coefficient"][::-1],
+         color=colors[::-1], edgecolor="white")
+ax3.axvline(0, color="black", linewidth=0.8)
+ax3.set_title("Top 10 Feature Coefficients", fontweight="bold")
+ax3.set_xlabel("Logistic Regression Coefficient")
+ax3.spines[["top", "right"]].set_visible(False)
+
+plt.savefig("/mnt/user-data/outputs/model_results.png",
+            dpi=150, bbox_inches="tight")
+plt.close()
+print("\nVisualisations saved → model_results.png")
+print("Script complete ✓")
