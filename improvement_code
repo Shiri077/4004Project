@@ -9,6 +9,8 @@ from sklearn.metrics import (
 )
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
 
 
 # ── 1. Load data ────────────────────────────────────────────────────────────
@@ -100,6 +102,36 @@ print("=" * 60)
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred,
                              target_names=["At Risk", "Good Performance"]))
+
+
+# 8b. Random Forest - alternate model ─────────────────────────────────────────
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42,
+                                   class_weight='balanced')
+rf_model.fit(X_train, y_train)          # Note: no scaling needed for RF
+
+y_pred_rf = rf_model.predict(X_test)
+rf_accuracy = accuracy_score(y_test, y_pred_rf)
+
+print("\n" + "=" * 60)
+print(f"RANDOM FOREST ACCURACY : {rf_accuracy * 100:.2f}%")
+print("=" * 60)
+print("\nRandom Forest Classification Report:")
+print(classification_report(y_test, y_pred_rf,
+                             target_names=["At Risk", "Good Performance"]))
+
+# Cross-validation comparison (5-fold, stratified)
+lr_cv  = cross_val_score(
+    LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced'),
+    X_enc, y, cv=5, scoring='f1')
+rf_cv  = cross_val_score(
+    RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'),
+    X_enc, y, cv=5, scoring='f1')
+
+print(f"\nCross-validated F1 (Logistic Regression) : "
+      f"{lr_cv.mean():.3f} ± {lr_cv.std():.3f}")
+print(f"Cross-validated F1 (Random Forest)       : "
+      f"{rf_cv.mean():.3f} ± {rf_cv.std():.3f}")
+
 
 # ── 9. Top feature importances ───────────────────────────────────────────────
 coef_df = pd.DataFrame({
