@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
-
+import os
 
 # ── 1. Load data ────────────────────────────────────────────────────────────
-df = pd.read_csv("/mnt/user-data/uploads/Students_Performance_dataset.csv")
+df = pd.read_csv("Students_Performance_dataset.csv")
 print("=" * 60)
 print("STUDENT PERFORMANCE – BINARY CLASSIFICATION")
 print("=" * 60)
@@ -33,7 +33,7 @@ label_map = {0: "at risk", 1: "good performance"}
 print(f"\nClass distribution:\n"
       f"  Good performance (CGPA ≥ 3.0) : {df['performance'].sum()}"
       f"  ({df['performance'].mean()*100:.1f} %)\n"
-      f"  At risk          (CGPA < 3.0) : {(df['performance']==0).sum()}"
+      f"  At risk          (CGPA < 3.0) : {(df['performance'] == 0).sum()}"
       f"  ({(1-df['performance'].mean())*100:.1f} %)")
 
 # ── 4. Feature engineering ───────────────────────────────────────────────────
@@ -41,28 +41,28 @@ print(f"\nClass distribution:\n"
 LEAKY = [cgpa_col, sgpa_col, "performance"]
 
 IRRELEVANT = [
-    "University Admission year",                          
-    "Gender",                   
-    "Age",                
-    "H.S.C passing year",                 
-    "Program",                          
+    "University Admission year",
+    "Gender",
+    "Age",
+    "H.S.C passing year",
+    "Program",
     "Do you use University transportation?",
-    "What is your preferable learning mode?",                
-    "Do you use smart phone?",                 
-    "Status of your Englishh language proficiency",                          
-    "What are the skills do you have?",              
-    "What is your interested area?",                
-    "What is your relationship status",                 
-    "Are you engaged with any co-curriculum activities?",                          
-    "With whom you are living with?",            
-    "Do you have any physical disabilities?",                                         
-    "How many Credit did you have completed?",              
+    "What is your preferable learning mode?",
+    "Do you use smart phone?",
+    "Status of your Englishh language proficiency",
+    "What are the skills do you have?",
+    "What is your interested area?",
+    "What is your relationship status",
+    "Are you engaged with any co-curriculum activities?",
+    "With whom you are living with?",
+    "Do you have any physical disabilities?",
+    "How many Credit did you have completed?",
 ]
 
 IRRELEVANT = [c for c in IRRELEVANT if c in df.columns]
 
 X_raw = df.drop(columns=LEAKY + IRRELEVANT)
-numeric_cols   = X_raw.select_dtypes(include=[np.number]).columns.tolist()
+numeric_cols = X_raw.select_dtypes(include=[np.number]).columns.tolist()
 categoric_cols = X_raw.select_dtypes(exclude=[np.number]).columns.tolist()
 
 print(f"\nFeatures used : {len(numeric_cols)} numeric, "
@@ -81,16 +81,17 @@ X_train, X_test, y_train, y_test = train_test_split(
 print(f"\nTrain size : {len(X_train)}  |  Test size : {len(X_test)}")
 
 # ── 6. Scale features ────────────────────────────────────────────────────────
-scaler  = StandardScaler()
+scaler = StandardScaler()
 X_train_sc = scaler.fit_transform(X_train)
-X_test_sc  = scaler.transform(X_test)
+X_test_sc = scaler.transform(X_test)
 
 # ── 7. Train Logistic Regression ─────────────────────────────────────────────
-model = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
+model = LogisticRegression(
+    max_iter=1000, random_state=42, class_weight="balanced")
 model.fit(X_train_sc, y_train)
 
 # ── 8. Evaluate ──────────────────────────────────────────────────────────────
-y_pred       = model.predict(X_test_sc)
+y_pred = model.predict(X_test_sc)
 y_pred_proba = model.predict_proba(X_test_sc)[:, 1]
 
 accuracy = accuracy_score(y_test, y_pred)
@@ -101,12 +102,12 @@ print("=" * 60)
 
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred,
-                             target_names=["At Risk", "Good Performance"]))
+                            target_names=["At Risk", "Good Performance"]))
 
 
 # 8b. Random Forest - alternate model ─────────────────────────────────────────
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42,
-                                   class_weight='balanced')
+                                  class_weight='balanced')
 rf_model.fit(X_train, y_train)          # Note: no scaling needed for RF
 
 y_pred_rf = rf_model.predict(X_test)
@@ -117,14 +118,16 @@ print(f"RANDOM FOREST ACCURACY : {rf_accuracy * 100:.2f}%")
 print("=" * 60)
 print("\nRandom Forest Classification Report:")
 print(classification_report(y_test, y_pred_rf,
-                             target_names=["At Risk", "Good Performance"]))
+                            target_names=["At Risk", "Good Performance"]))
 
 # Cross-validation comparison (5-fold, stratified)
-lr_cv  = cross_val_score(
-    LogisticRegression(max_iter=1000, random_state=42, class_weight='balanced'),
+lr_cv = cross_val_score(
+    LogisticRegression(max_iter=1000, random_state=42,
+                       class_weight='balanced'),
     X_enc, y, cv=5, scoring='f1')
-rf_cv  = cross_val_score(
-    RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'),
+rf_cv = cross_val_score(
+    RandomForestClassifier(
+        n_estimators=100, random_state=42, class_weight='balanced'),
     X_enc, y, cv=5, scoring='f1')
 
 print(f"\nCross-validated F1 (Logistic Regression) : "
@@ -135,9 +138,9 @@ print(f"Cross-validated F1 (Random Forest)       : "
 
 # ── 9. Top feature importances ───────────────────────────────────────────────
 coef_df = pd.DataFrame({
-    "Feature"    : X_enc.columns,
+    "Feature": X_enc.columns,
     "Coefficient": model.coef_[0],
-    "Abs"        : np.abs(model.coef_[0])
+    "Abs": np.abs(model.coef_[0])
 }).sort_values("Abs", ascending=False).head(10)
 
 print("Top 10 Most Influential Features:")
@@ -167,7 +170,7 @@ ax0.spines[["top", "right"]].set_visible(False)
 # (b) CGPA distribution by class
 ax1 = fig.add_subplot(gs[0, 1])
 at_risk = df.loc[df["performance"] == 0, cgpa_col]
-good    = df.loc[df["performance"] == 1, cgpa_col]
+good = df.loc[df["performance"] == 1, cgpa_col]
 ax1.hist(at_risk, bins=20, color="#e74c3c", alpha=0.7,
          label=f"At Risk (n={len(at_risk)})", edgecolor="white")
 ax1.hist(good,    bins=20, color="#2ecc71", alpha=0.7,
@@ -193,7 +196,7 @@ ax2.set_title(f"LR Confusion Matrix (Acc: {accuracy*100:.1f}%)",
 ax3 = fig.add_subplot(gs[1, 1])
 cm_rf = confusion_matrix(y_test, y_pred_rf)
 disp_rf = ConfusionMatrixDisplay(confusion_matrix=cm_rf,
-                                  display_labels=["At Risk", "Good Perf."])
+                                 display_labels=["At Risk", "Good Perf."])
 disp_rf.plot(ax=ax3, colorbar=False, cmap="Purples")
 ax3.set_title(f"RF Confusion Matrix (Acc: {rf_accuracy*100:.1f}%)",
               fontweight="bold")
@@ -204,7 +207,8 @@ ax4.bar(["Logistic\nRegression", "Random\nForest"],
         [lr_cv.mean(), rf_cv.mean()],
         yerr=[lr_cv.std(), rf_cv.std()],
         color=["#3498db", "#9b59b6"], edgecolor="white", capsize=6)
-ax4.set_title("Cross-Validated F1 Score\n(mean ± std, 5-fold)", fontweight="bold")
+ax4.set_title("Cross-Validated F1 Score\n(mean ± std, 5-fold)",
+              fontweight="bold")
 ax4.set_ylabel("F1 Score")
 ax4.set_ylim(0, 1)
 ax4.spines[["top", "right"]].set_visible(False)
@@ -212,7 +216,7 @@ ax4.spines[["top", "right"]].set_visible(False)
 # (f) Top 10 RF feature importances
 ax5 = fig.add_subplot(gs[1, 2])
 rf_imp = pd.DataFrame({
-    "Feature"   : X_enc.columns,
+    "Feature": X_enc.columns,
     "Importance": rf_model.feature_importances_
 }).sort_values("Importance", ascending=False).head(10)
 ax5.barh(rf_imp["Feature"][::-1], rf_imp["Importance"][::-1],
@@ -221,8 +225,11 @@ ax5.set_title("Top 10 RF Feature Importances", fontweight="bold")
 ax5.set_xlabel("Importance Score")
 ax5.spines[["top", "right"]].set_visible(False)
 
-plt.savefig("/mnt/user-data/outputs/model_results.png",
+os.makedirs("figures", exist_ok=True)
+
+plt.savefig("figures/model_results.png",
             dpi=150, bbox_inches="tight")
+
 plt.close()
 print("\nVisualisations saved → model_results.png")
 print("Script complete ✓")
