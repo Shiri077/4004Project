@@ -1,3 +1,4 @@
+from sklearn.pipeline import Pipeline
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -50,7 +51,7 @@ IRRELEVANT = [
     "What is your preferable learning mode?",
     "Do you use smart phone?",
     "Status of your Englishh language proficiency",
-    "What are the skills do you have?",
+    "What are the skills do you have ?",
     "What is your interested area?",
     "What is your relationship status",
     "Are you engaged with any co-curriculum activities?",
@@ -87,7 +88,7 @@ X_test_sc = scaler.transform(X_test)
 
 # ── 7. Train Logistic Regression ─────────────────────────────────────────────
 model = LogisticRegression(
-    max_iter=1000, random_state=42, class_weight="balanced")
+    max_iter=5000, random_state=42, class_weight="balanced")
 model.fit(X_train_sc, y_train)
 
 # ── 8. Evaluate ──────────────────────────────────────────────────────────────
@@ -121,10 +122,14 @@ print(classification_report(y_test, y_pred_rf,
                             target_names=["At Risk", "Good Performance"]))
 
 # Cross-validation comparison (5-fold, stratified)
-lr_cv = cross_val_score(
-    LogisticRegression(max_iter=1000, random_state=42,
-                       class_weight='balanced'),
-    X_enc, y, cv=5, scoring='f1')
+
+lr_pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('model', LogisticRegression(max_iter=5000,
+     random_state=42, class_weight='balanced'))
+])
+
+lr_cv = cross_val_score(lr_pipeline, X_enc, y, cv=5, scoring='f1')
 rf_cv = cross_val_score(
     RandomForestClassifier(
         n_estimators=100, random_state=42, class_weight='balanced'),
