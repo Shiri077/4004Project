@@ -144,10 +144,10 @@ print("Top 10 Most Influential Features:")
 print(coef_df[["Feature", "Coefficient"]].to_string(index=False))
 
 # ── 10. Visualise results ────────────────────────────────────────────────────
-fig = plt.figure(figsize=(16, 10))
-fig.suptitle("Student Performance – Logistic Regression Results",
+fig = plt.figure(figsize=(18, 12))
+fig.suptitle("Student Performance – Model Comparison Results",
              fontsize=15, fontweight="bold", y=1.01)
-gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.45, wspace=0.35)
+gs = gridspec.GridSpec(2, 3, figure=fig, hspace=0.45, wspace=0.4)
 
 # (a) Class distribution
 ax0 = fig.add_subplot(gs[0, 0])
@@ -180,26 +180,46 @@ ax1.set_ylabel("Count")
 ax1.legend(fontsize=8)
 ax1.spines[["top", "right"]].set_visible(False)
 
-# (c) Confusion matrix
+# (c) Confusion matrix – Logistic Regression
 ax2 = fig.add_subplot(gs[1, 0])
 cm = confusion_matrix(y_test, y_pred)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
                               display_labels=["At Risk", "Good Perf."])
 disp.plot(ax=ax2, colorbar=False, cmap="Blues")
-ax2.set_title(f"Confusion Matrix  (Accuracy: {accuracy*100:.2f}%)",
+ax2.set_title(f"LR Confusion Matrix (Acc: {accuracy*100:.1f}%)",
               fontweight="bold")
 
-# (d) Top 10 feature importances
+# (d) Confusion matrix – Random Forest
 ax3 = fig.add_subplot(gs[1, 1])
-colors = ["#e74c3c" if c < 0 else "#3498db"
-          for c in coef_df["Coefficient"]]
-ax3.barh(coef_df["Feature"][::-1],
-         coef_df["Coefficient"][::-1],
-         color=colors[::-1], edgecolor="white")
-ax3.axvline(0, color="black", linewidth=0.8)
-ax3.set_title("Top 10 Feature Coefficients", fontweight="bold")
-ax3.set_xlabel("Logistic Regression Coefficient")
-ax3.spines[["top", "right"]].set_visible(False)
+cm_rf = confusion_matrix(y_test, y_pred_rf)
+disp_rf = ConfusionMatrixDisplay(confusion_matrix=cm_rf,
+                                  display_labels=["At Risk", "Good Perf."])
+disp_rf.plot(ax=ax3, colorbar=False, cmap="Purples")
+ax3.set_title(f"RF Confusion Matrix (Acc: {rf_accuracy*100:.1f}%)",
+              fontweight="bold")
+
+# (e) Cross-validated F1 comparison
+ax4 = fig.add_subplot(gs[0, 2])
+ax4.bar(["Logistic\nRegression", "Random\nForest"],
+        [lr_cv.mean(), rf_cv.mean()],
+        yerr=[lr_cv.std(), rf_cv.std()],
+        color=["#3498db", "#9b59b6"], edgecolor="white", capsize=6)
+ax4.set_title("Cross-Validated F1 Score\n(mean ± std, 5-fold)", fontweight="bold")
+ax4.set_ylabel("F1 Score")
+ax4.set_ylim(0, 1)
+ax4.spines[["top", "right"]].set_visible(False)
+
+# (f) Top 10 RF feature importances
+ax5 = fig.add_subplot(gs[1, 2])
+rf_imp = pd.DataFrame({
+    "Feature"   : X_enc.columns,
+    "Importance": rf_model.feature_importances_
+}).sort_values("Importance", ascending=False).head(10)
+ax5.barh(rf_imp["Feature"][::-1], rf_imp["Importance"][::-1],
+         color="#9b59b6", edgecolor="white")
+ax5.set_title("Top 10 RF Feature Importances", fontweight="bold")
+ax5.set_xlabel("Importance Score")
+ax5.spines[["top", "right"]].set_visible(False)
 
 plt.savefig("/mnt/user-data/outputs/model_results.png",
             dpi=150, bbox_inches="tight")
