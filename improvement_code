@@ -9,8 +9,7 @@ from sklearn.metrics import (
 )
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import warnings
-warnings.filterwarnings("ignore")
+
 
 # ── 1. Load data ────────────────────────────────────────────────────────────
 df = pd.read_csv("/mnt/user-data/uploads/Students_Performance_dataset.csv")
@@ -85,7 +84,7 @@ X_train_sc = scaler.fit_transform(X_train)
 X_test_sc  = scaler.transform(X_test)
 
 # ── 7. Train Logistic Regression ─────────────────────────────────────────────
-model = LogisticRegression(max_iter=1000, random_state=42)
+model = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
 model.fit(X_train_sc, y_train)
 
 # ── 8. Evaluate ──────────────────────────────────────────────────────────────
